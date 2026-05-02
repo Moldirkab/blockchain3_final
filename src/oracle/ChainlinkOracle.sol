@@ -35,7 +35,11 @@ contract ChainlinkOracle is AccessControl {
         (, int256 answer, , uint256 updatedAt, ) = priceFeed.latestRoundData();
 
         if (answer <= 0) revert InvalidPrice();
-        if (block.timestamp - updatedAt > maxStaleness) revert StalePrice();
+        if (updatedAt == 0) revert StalePrice();
+
+        if (block.timestamp > updatedAt + maxStaleness) {
+            revert StalePrice();
+        }
 
         uint8 decimals = priceFeed.decimals();
 
