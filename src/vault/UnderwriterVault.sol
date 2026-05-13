@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract UnderwriterVault is ERC4626, AccessControl {
@@ -20,7 +20,7 @@ contract UnderwriterVault is ERC4626, AccessControl {
         address receiver,
         uint256 amount
     ) external onlyRole(INSURANCE_POOL_ROLE) {
-        IERC20(asset()).transfer(receiver, amount);
+        SafeERC20.safeTransfer(IERC20(asset()), receiver, amount);
     }
 
     function availableLiquidity() external view returns (uint256) {
