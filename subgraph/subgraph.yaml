@@ -1,0 +1,106 @@
+specVersion: 0.0.4
+description: Decentralized Insurance Pool Subgraph
+repository: https://github.com/your-repo
+schema:
+  file: ./schema.graphql
+
+dataSources:
+  - kind: ethereum/contract
+    name: InsurancePool
+    network: arbitrum-sepolia
+    source:
+      address: "0x1e485606B0806Ea72508119Af2B132dc8F26E2B0"
+      abi: InsurancePool
+      startBlock: 267762994
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.6
+      language: wasm/assemblyscript
+      entities:
+        - Policy
+        - Claim
+        - PolicyPurchase
+        - RiskType
+      abis:
+        - name: InsurancePool
+          file: ./abis/InsurancePool.json
+      eventHandlers:
+        - event: RiskTypeUpdated(indexed bytes32,bool,uint256,uint256,uint256)
+          handler: handleRiskTypeUpdated
+        - event: PolicyPurchased(indexed address,indexed uint256,indexed bytes32,uint256,uint256)
+          handler: handlePolicyPurchased
+        - event: ClaimPaid(indexed address,indexed uint256,uint256)
+          handler: handleClaimPaid
+      file: ./src/insurance-pool.ts
+
+  - kind: ethereum/contract
+    name: PolicyNFT
+    network: arbitrum-sepolia
+    source:
+      address: "0x778aa3d56d284BdBA96350306D0B8a02BF9B9250"
+      abi: PolicyNFT
+      startBlock: 267762994
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.6
+      language: wasm/assemblyscript
+      entities:
+        - Policy
+      abis:
+        - name: PolicyNFT
+          file: ./abis/PolicyNFT.json
+      eventHandlers:
+        - event: PolicyMinted(indexed uint256,indexed address,uint256,uint256,uint256,indexed bytes32)
+          handler: handlePolicyMinted
+        - event: PolicyDeactivated(indexed uint256)
+          handler: handlePolicyDeactivated
+      file: ./src/policy-nft.ts
+
+  - kind: ethereum/contract
+    name: RiskAMM
+    network: arbitrum-sepolia
+    source:
+      address: "0x9cF2362C438F8eE98746f68f03Ff54d514307c92"
+      abi: RiskAMM
+      startBlock: 267762994
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.6
+      language: wasm/assemblyscript
+      entities:
+        - LiquidityPosition
+        - Swap
+      abis:
+        - name: RiskAMM
+          file: ./abis/RiskAMM.json
+      eventHandlers:
+        - event: LiquidityAdded(indexed address,uint256,uint256,uint256)
+          handler: handleLiquidityAdded
+        - event: LiquidityRemoved(indexed address,uint256,uint256,uint256)
+          handler: handleLiquidityRemoved
+        - event: Swapped(indexed address,address,uint256,uint256)
+          handler: handleSwapped
+      file: ./src/risk-amm.ts
+
+  - kind: ethereum/contract
+    name: ProtocolTreasury
+    network: arbitrum-sepolia
+    source:
+      address: "0xD2B179a3a8206845de14f627009D02F17ae04cE8"
+      abi: ProtocolTreasury
+      startBlock: 267762994
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.6
+      language: wasm/assemblyscript
+      entities:
+        - TreasuryWithdrawal
+      abis:
+        - name: ProtocolTreasury
+          file: ./abis/ProtocolTreasury.json
+      eventHandlers:
+        - event: TokenWithdrawn(indexed address,indexed address,uint256)
+          handler: handleTokenWithdrawn
+        - event: ProtocolFeeUpdated(uint256,uint256)
+          handler: handleProtocolFeeUpdated
+      file: ./src/treasury.ts

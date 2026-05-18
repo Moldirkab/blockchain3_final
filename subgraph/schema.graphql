@@ -1,0 +1,75 @@
+type Policy @entity(immutable: false) {
+  id: ID!
+  tokenId: BigInt!
+  policyholder: Bytes!
+  coverageAmount: BigInt!
+  premium: BigInt!
+  expiry: BigInt!
+  riskType: Bytes!
+  active: Boolean!
+  claimed: Boolean!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type Claim @entity(immutable: true) {
+  id: ID!
+  user: Bytes!
+  policyId: BigInt!
+  amount: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type RiskType @entity(immutable: false) {
+  id: ID!
+  riskType: Bytes!
+  accepted: Boolean!
+  premiumBps: BigInt!
+  triggerPrice: BigInt!
+  duration: BigInt!
+  updatedAt: BigInt!
+}
+
+type PolicyPurchase @entity(immutable: true) {
+  id: ID!
+  buyer: Bytes!
+  policyId: BigInt!
+  riskType: Bytes!
+  coverage: BigInt!
+  premium: BigInt!
+  timestamp: BigInt!
+}
+
+type Swap @entity(immutable: true) {
+  id: ID!
+  user: Bytes!
+  tokenIn: Bytes!
+  amountIn: BigInt!
+  amountOut: BigInt!
+  timestamp: BigInt!
+}
+
+type LiquidityPosition @entity(immutable: false) {
+  id: ID!
+  provider: Bytes!
+  amount0: BigInt!
+  amount1: BigInt!
+  shares: BigInt!
+  timestamp: BigInt!
+}
+
+type TreasuryWithdrawal @entity(immutable: true) {
+  id: ID!
+  token: Bytes!
+  to: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+}
+
+type TreasuryFeeUpdate @entity(immutable: true) {
+  id: ID!
+  oldFeeBps: BigInt!
+  newFeeBps: BigInt!
+  timestamp: BigInt!
+}

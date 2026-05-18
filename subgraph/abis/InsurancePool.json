@@ -1,0 +1,36 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "riskType", "type": "bytes32" },
+      { "indexed": false, "name": "accepted", "type": "bool" },
+      { "indexed": false, "name": "premiumBps", "type": "uint256" },
+      { "indexed": false, "name": "triggerPrice", "type": "uint256" },
+      { "indexed": false, "name": "duration", "type": "uint256" }
+    ],
+    "name": "RiskTypeUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "buyer", "type": "address" },
+      { "indexed": true, "name": "policyId", "type": "uint256" },
+      { "indexed": true, "name": "riskType", "type": "bytes32" },
+      { "indexed": false, "name": "coverage", "type": "uint256" },
+      { "indexed": false, "name": "premium", "type": "uint256" }
+    ],
+    "name": "PolicyPurchased",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "user", "type": "address" },
+      { "indexed": true, "name": "policyId", "type": "uint256" },
+      { "indexed": false, "name": "amount", "type": "uint256" }
+    ],
+    "name": "ClaimPaid",
+    "type": "event"
+  }
+]

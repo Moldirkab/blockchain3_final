@@ -1,0 +1,4 @@
+# Inside your .gitignore
+node_modules/
+build/
+generated/

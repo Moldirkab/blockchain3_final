@@ -1,0 +1,23 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "tokenId", "type": "uint256" },
+      { "indexed": true, "name": "policyholder", "type": "address" },
+      { "indexed": false, "name": "coverageAmount", "type": "uint256" },
+      { "indexed": false, "name": "premium", "type": "uint256" },
+      { "indexed": false, "name": "expiry", "type": "uint256" },
+      { "indexed": true, "name": "riskType", "type": "bytes32" }
+    ],
+    "name": "PolicyMinted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "tokenId", "type": "uint256" }
+    ],
+    "name": "PolicyDeactivated",
+    "type": "event"
+  }
+]
