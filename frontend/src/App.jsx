@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
 
-// ── Contract Addresses (Arbitrum Sepolia) ────────────────────────────────────
 const ADDRESSES = {
   governanceToken: "0xE702422e215AEc71Db454590cBAe7b9570A775C6",
   stableToken:     "0xAb71a7c9d52056925652d5C65607A91Fe5D7D750",
@@ -15,7 +14,20 @@ const ADDRESSES = {
   factory:         "0x366a89cC4f309677A38D3CF4024390046Cc3e911",
 };
 
-// ── ABIs ─────────────────────────────────────────────────────────────────────
+
+async function getGasOpts(provider) {
+  const feeData = await provider.getFeeData();
+  const base = feeData.maxFeePerGas ?? feeData.gasPrice ?? ethers.parseUnits("0.1", "gwei");
+  const tip  = feeData.maxPriorityFeePerGas ?? ethers.parseUnits("0.01", "gwei");
+  // Add 20% buffer so we always clear the current base fee
+  const buffered = (base * 120n) / 100n;
+  const bufferedTip = (tip * 120n) / 100n;
+  if (feeData.maxFeePerGas) {
+    return { maxFeePerGas: buffered, maxPriorityFeePerGas: bufferedTip };
+  }
+  return { gasPrice: buffered };
+}
+
 const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
   "function decimals() view returns (uint8)",
@@ -58,11 +70,9 @@ const GOVERNOR_ABI = [
   "function castVote(uint256 proposalId, uint8 support) returns (uint256)",
 ];
 
-const PROPOSAL_ID = "98880771107137624284678011468404233143556596969012362779027641758325374327148";
-
+const PROPOSAL_ID = "14499547049506927288248606806537596776542500897182930421070886837967083350094";
 const PROPOSAL_STATES = ["Pending","Active","Canceled","Defeated","Succeeded","Queued","Expired","Executed"];
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
 
@@ -85,10 +95,8 @@ const styles = `
   }
 
   body { background: var(--bg); color: var(--text); font-family: var(--font-display); min-height: 100vh; }
-
   .app { min-height: 100vh; display: flex; flex-direction: column; }
 
-  /* Header */
   .header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 1rem 2rem; border-bottom: 1px solid var(--border);
@@ -111,7 +119,6 @@ const styles = `
     padding: 0.4rem 0.9rem; border-radius: 20px;
   }
 
-  /* Nav */
   .nav {
     display: flex; gap: 0; padding: 0 2rem;
     border-bottom: 1px solid var(--border); background: var(--surface);
@@ -126,10 +133,8 @@ const styles = `
   .nav-btn:hover { color: var(--text); }
   .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-  /* Main */
   .main { flex: 1; padding: 2rem; max-width: 1100px; margin: 0 auto; width: 100%; }
 
-  /* Cards */
   .card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem;
@@ -141,7 +146,6 @@ const styles = `
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
 
-  /* Stat */
   .stat { padding: 1rem; background: var(--surface2); border-radius: 12px; }
   .stat-label { font-size: 0.7rem; color: var(--muted); margin-bottom: 0.3rem; font-family: var(--font-mono); }
   .stat-value { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }
@@ -150,7 +154,6 @@ const styles = `
   .stat-value.purple { color: var(--accent2); }
   .stat-value.yellow { color: var(--yellow); }
 
-  /* Form */
   .form-group { margin-bottom: 1rem; }
   .form-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; display: block; font-family: var(--font-mono); }
   .form-input {
@@ -161,7 +164,6 @@ const styles = `
   }
   .form-input:focus { border-color: var(--accent); }
 
-  /* Buttons */
   .btn {
     padding: 0.7rem 1.4rem; border-radius: 8px; border: none;
     cursor: pointer; font-family: var(--font-display); font-weight: 700;
@@ -173,41 +175,28 @@ const styles = `
   .btn-danger:hover { opacity: 0.85; }
   .btn-success { background: var(--green); color: var(--bg); }
   .btn-success:hover { opacity: 0.85; }
-  .btn-outline {
-    background: transparent; color: var(--accent);
-    border: 1px solid var(--accent);
-  }
+  .btn-outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
   .btn-outline:hover { background: rgba(0,212,255,0.08); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* Status */
   .status {
     margin-top: 1rem; padding: 0.7rem 1rem; border-radius: 8px;
     font-family: var(--font-mono); font-size: 0.8rem;
   }
   .status.success { background: rgba(0,255,157,0.08); color: var(--green); border: 1px solid rgba(0,255,157,0.2); }
-  .status.error { background: rgba(255,75,110,0.08); color: var(--red); border: 1px solid rgba(255,75,110,0.2); }
-  .status.info { background: rgba(0,212,255,0.08); color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
+  .status.error   { background: rgba(255,75,110,0.08); color: var(--red);   border: 1px solid rgba(255,75,110,0.2); }
+  .status.info    { background: rgba(0,212,255,0.08);  color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
 
-  /* Vote buttons */
   .vote-row { display: flex; gap: 1rem; }
-  .badge {
-    display: inline-block; padding: 0.25rem 0.6rem; border-radius: 20px;
-    font-size: 0.7rem; font-weight: 700; font-family: var(--font-mono);
-  }
-  .badge-green { background: rgba(0,255,157,0.15); color: var(--green); }
-  .badge-red { background: rgba(255,75,110,0.15); color: var(--red); }
-  .badge-blue { background: rgba(0,212,255,0.15); color: var(--accent); }
+  .badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.7rem; font-weight: 700; font-family: var(--font-mono); }
+  .badge-green  { background: rgba(0,255,157,0.15);  color: var(--green); }
+  .badge-red    { background: rgba(255,75,110,0.15); color: var(--red); }
+  .badge-blue   { background: rgba(0,212,255,0.15);  color: var(--accent); }
 
-  /* Page title */
   .page-title { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.3rem; letter-spacing: -0.03em; }
-  .page-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; font-family: var(--font-mono); }
+  .page-sub   { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; font-family: var(--font-mono); }
 
-  /* Connect prompt */
-  .connect-prompt {
-    text-align: center; padding: 4rem 2rem;
-    color: var(--muted); font-family: var(--font-mono);
-  }
+  .connect-prompt { text-align: center; padding: 4rem 2rem; color: var(--muted); font-family: var(--font-mono); }
   .connect-prompt h2 { font-size: 1.2rem; margin-bottom: 0.5rem; color: var(--text); }
 
   @media (max-width: 640px) {
@@ -216,13 +205,11 @@ const styles = `
   }
 `;
 
-// ── Helper ────────────────────────────────────────────────────────────────────
 const fmt = (val, dec = 18) => {
   try { return Number(ethers.formatUnits(val, dec)).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
   catch { return "0"; }
 };
 
-// ── Pages ─────────────────────────────────────────────────────────────────────
 
 function Dashboard({ signer, wallet }) {
   const [data, setData] = useState({});
@@ -250,34 +237,14 @@ function Dashboard({ signer, wallet }) {
     <div>
       <div className="page-title">Dashboard</div>
       <div className="page-sub">Overview of your DeFi Insurance Protocol positions</div>
-
       <div className="grid-3">
-        <div className="stat">
-          <div className="stat-label">GOV Token Balance</div>
-          <div className="stat-value purple">{fmt(data.govBal || 0n)}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Stable Token Balance</div>
-          <div className="stat-value blue">{fmt(data.stableBal || 0n)}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Voting Power</div>
-          <div className="stat-value green">{fmt(data.votes || 0n)}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Vault Total Assets</div>
-          <div className="stat-value yellow">{fmt(data.totalAssets || 0n)}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Available Liquidity</div>
-          <div className="stat-value blue">{fmt(data.liquidity || 0n)}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Network</div>
-          <div className="stat-value" style={{fontSize:'1rem'}}>Arbitrum Sepolia</div>
-        </div>
+        <div className="stat"><div className="stat-label">GOV Token Balance</div><div className="stat-value purple">{fmt(data.govBal || 0n)}</div></div>
+        <div className="stat"><div className="stat-label">Stable Token Balance</div><div className="stat-value blue">{fmt(data.stableBal || 0n)}</div></div>
+        <div className="stat"><div className="stat-label">Voting Power</div><div className="stat-value green">{fmt(data.votes || 0n)}</div></div>
+        <div className="stat"><div className="stat-label">Vault Total Assets</div><div className="stat-value yellow">{fmt(data.totalAssets || 0n)}</div></div>
+        <div className="stat"><div className="stat-label">Available Liquidity</div><div className="stat-value blue">{fmt(data.liquidity || 0n)}</div></div>
+        <div className="stat"><div className="stat-label">Network</div><div className="stat-value" style={{fontSize:'1rem'}}>Arbitrum Sepolia</div></div>
       </div>
-
       <div className="card" style={{marginTop:'1.5rem'}}>
         <div className="card-title">Protocol Contracts</div>
         <div style={{display:'grid', gap:'0.5rem'}}>
@@ -297,16 +264,15 @@ function Insurance({ signer, wallet }) {
   const [coverage, setCoverage] = useState("");
   const [duration, setDuration] = useState("");
   const [policyId, setPolicyId] = useState("");
+  const [riskTypeInput, setRiskTypeInput] = useState("DEPEG");
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [riskTypeInput, setRiskTypeInput] = useState("DEPEG");
 
-const buyPolicy = async () => {
+  const buyPolicy = async () => {
     if (!signer) return;
     setLoading(true); setStatus(null);
     try {
-      const feeData = await signer.provider.getFeeData();
-      const gasopts = { maxFeePerGas: feeData.maxFeePerGas, maxPriorityFeePerGas: feeData.maxPriorityFeePerGas };
+      const gasopts = await getGasOpts(signer.provider);
       const stable = new ethers.Contract(ADDRESSES.stableToken, ERC20_ABI, signer);
       const approveTx = await stable.approve(ADDRESSES.insurancePool, ethers.parseEther(coverage), gasopts);
       await approveTx.wait();
@@ -325,12 +291,22 @@ const buyPolicy = async () => {
     if (!signer) return;
     setLoading(true); setStatus(null);
     try {
+      const gasopts = await getGasOpts(signer.provider);
       const pool = new ethers.Contract(ADDRESSES.insurancePool, INSURANCE_ABI, signer);
-      const feeData = await signer.provider.getFeeData(); const tx = await pool.claim(Number(policyId), { maxFeePerGas: feeData.maxFeePerGas, maxPriorityFeePerGas: feeData.maxPriorityFeePerGas });
+      const tx = await pool.claim(Number(policyId), gasopts);
       await tx.wait();
-      setStatus({ type: "success", msg: `Claim submitted! TX: ${tx.hash.slice(0,10)}...` });
+      setStatus({ type: "success", msg: `Claim paid! TX: ${tx.hash}` });
     } catch(e) {
-      setStatus({ type: "error", msg: e.reason || e.message });
+      const errorMessages = {
+        "0x19abf40e": "⚠️ Trigger Not Met — depeg event has not occurred yet",
+        "0x0dc149f0": "❌ Policy Not Active",
+        "0x203d82d8": "⏰ Policy Expired",
+        "0x646cf558": "Already Claimed",
+        "0x8b7321e4": "You are not the policy owner",
+      };
+      const errorData = e?.data || e?.info?.error?.data || "";
+      const friendly = errorMessages[errorData?.slice(0, 10)] || e?.reason || "Transaction failed";
+      setStatus({ type: "error", msg: friendly });
     }
     setLoading(false);
   };
@@ -339,19 +315,18 @@ const buyPolicy = async () => {
     <div>
       <div className="page-title">Insurance Pool</div>
       <div className="page-sub">Buy coverage policies and submit claims</div>
-
       <div className="grid-2">
         <div className="card">
           <div className="card-title">Buy Policy</div>
           <div className="form-group">
-            <div className="form-group">
-  <label className="form-label">Risk Type</label>
-  <select className="form-input" value={riskTypeInput} onChange={e => setRiskTypeInput(e.target.value)}>
-    <option value="DEPEG">DEPEG</option>
-    <option value="WEATHER">WEATHER</option>
-    <option value="LIQUIDATION">LIQUIDATION</option>
-  </select>
-</div>
+            <label className="form-label">Risk Type</label>
+            <select className="form-input" value={riskTypeInput} onChange={e => setRiskTypeInput(e.target.value)}>
+              <option value="DEPEG">DEPEG</option>
+              <option value="WEATHER">WEATHER</option>
+              <option value="LIQUIDATION">LIQUIDATION</option>
+            </select>
+          </div>
+          <div className="form-group">
             <label className="form-label">Coverage Amount (tokens)</label>
             <input className="form-input" value={coverage} onChange={e => setCoverage(e.target.value)} placeholder="1000" />
           </div>
@@ -363,7 +338,6 @@ const buyPolicy = async () => {
             {loading ? "Processing..." : "Buy Policy"}
           </button>
         </div>
-
         <div className="card">
           <div className="card-title">Submit Claim</div>
           <div className="form-group">
@@ -378,7 +352,6 @@ const buyPolicy = async () => {
           </button>
         </div>
       </div>
-
       {status && <div className={`status ${status.type}`}>{status.msg}</div>}
     </div>
   );
@@ -406,14 +379,19 @@ function Vault({ signer, wallet }) {
   const deposit = async () => {
     setLoading(true); setStatus(null);
     try {
+      // Always fetch live gas fees — never hardcode gasPrice
+      const gasopts = await getGasOpts(signer.provider);
       const stable = new ethers.Contract(ADDRESSES.stableToken, ERC20_ABI, signer);
       const vault  = new ethers.Contract(ADDRESSES.vault, VAULT_ABI, signer);
       const amt = ethers.parseEther(depositAmt);
-      const approveTx = await stable.approve(ADDRESSES.vault, amt);
+      const approveTx = await stable.approve(ADDRESSES.vault, amt, gasopts);
       await approveTx.wait();
-      const tx = await vault.deposit(amt, wallet, { gasPrice: ethers.parseUnits("0.1", "gwei") });
+      const tx = await vault.deposit(amt, wallet, gasopts);
       await tx.wait();
       setStatus({ type: "success", msg: `Deposited ${depositAmt} tokens as underwriter!` });
+      // Refresh balances
+      const [s, t] = await Promise.all([vault.balanceOf(wallet), vault.totalAssets()]);
+      setShares(fmt(s)); setTotalAssets(fmt(t));
     } catch(e) {
       setStatus({ type: "error", msg: e.reason || e.message });
     }
@@ -423,10 +401,15 @@ function Vault({ signer, wallet }) {
   const withdraw = async () => {
     setLoading(true); setStatus(null);
     try {
+      // Always fetch live gas fees — never hardcode gasPrice
+      const gasopts = await getGasOpts(signer.provider);
       const vault = new ethers.Contract(ADDRESSES.vault, VAULT_ABI, signer);
-      const tx = await vault.withdraw(ethers.parseEther(withdrawAmt), wallet, wallet, { gasPrice: ethers.parseUnits("0.1", "gwei") });
+      const tx = await vault.withdraw(ethers.parseEther(withdrawAmt), wallet, wallet, gasopts);
       await tx.wait();
       setStatus({ type: "success", msg: `Withdrew ${withdrawAmt} tokens!` });
+      // Refresh balances
+      const [s, t] = await Promise.all([vault.balanceOf(wallet), vault.totalAssets()]);
+      setShares(fmt(s)); setTotalAssets(fmt(t));
     } catch(e) {
       setStatus({ type: "error", msg: e.reason || e.message });
     }
@@ -437,18 +420,10 @@ function Vault({ signer, wallet }) {
     <div>
       <div className="page-title">Underwriter Vault</div>
       <div className="page-sub">ERC-4626 vault — stake collateral to earn yield as an underwriter</div>
-
       <div className="grid-2" style={{marginBottom:'1.5rem'}}>
-        <div className="stat">
-          <div className="stat-label">Your Vault Shares</div>
-          <div className="stat-value green">{shares}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Total Assets in Vault</div>
-          <div className="stat-value blue">{totalAssets}</div>
-        </div>
+        <div className="stat"><div className="stat-label">Your Vault Shares</div><div className="stat-value green">{shares}</div></div>
+        <div className="stat"><div className="stat-label">Total Assets in Vault</div><div className="stat-value blue">{totalAssets}</div></div>
       </div>
-
       <div className="grid-2">
         <div className="card">
           <div className="card-title">Deposit (Underwrite)</div>
@@ -460,7 +435,6 @@ function Vault({ signer, wallet }) {
             {loading ? "Processing..." : "Deposit & Earn Yield"}
           </button>
         </div>
-
         <div className="card">
           <div className="card-title">Withdraw</div>
           <div className="form-group">
@@ -472,7 +446,6 @@ function Vault({ signer, wallet }) {
           </button>
         </div>
       </div>
-
       {status && <div className={`status ${status.type}`}>{status.msg}</div>}
     </div>
   );
@@ -498,8 +471,15 @@ function AMM({ signer, wallet }) {
   const addLiquidity = async () => {
     setLoading(true); setStatus(null);
     try {
-      const amm = new ethers.Contract(ADDRESSES.amm, AMM_ABI, signer);
-      const tx = await amm.addLiquidity(ethers.parseEther(amtA), ethers.parseEther(amtB));
+      const gasopts = await getGasOpts(signer.provider);
+      const stable   = new ethers.Contract(ADDRESSES.stableToken, ERC20_ABI, signer);
+      const govToken = new ethers.Contract(ADDRESSES.governanceToken, ERC20_ABI, signer);
+      const amm      = new ethers.Contract(ADDRESSES.amm, AMM_ABI, signer);
+      const a1 = await stable.approve(ADDRESSES.amm, ethers.parseEther(amtA), gasopts);
+      await a1.wait();
+      const a2 = await govToken.approve(ADDRESSES.amm, ethers.parseEther(amtB), gasopts);
+      await a2.wait();
+      const tx = await amm.addLiquidity(ethers.parseEther(amtA), ethers.parseEther(amtB), gasopts);
       await tx.wait();
       setStatus({ type: "success", msg: "Liquidity added successfully!" });
     } catch(e) {
@@ -511,8 +491,12 @@ function AMM({ signer, wallet }) {
   const swap = async () => {
     setLoading(true); setStatus(null);
     try {
-      const amm = new ethers.Contract(ADDRESSES.amm, AMM_ABI, signer);
-      const feeData = await signer.provider.getFeeData(); const gasopts = { maxFeePerGas: feeData.maxFeePerGas, maxPriorityFeePerGas: feeData.maxPriorityFeePerGas }; const stable = new ethers.Contract(ADDRESSES.stableToken, ERC20_ABI, signer); const approveTx = await stable.approve(ADDRESSES.amm, ethers.parseEther(swapAmt), gasopts); await approveTx.wait(); const tx = await amm.swap(ADDRESSES.stableToken, ethers.parseEther(swapAmt), 0n, gasopts);
+      const gasopts = await getGasOpts(signer.provider);
+      const stable = new ethers.Contract(ADDRESSES.stableToken, ERC20_ABI, signer);
+      const amm    = new ethers.Contract(ADDRESSES.amm, AMM_ABI, signer);
+      const approveTx = await stable.approve(ADDRESSES.amm, ethers.parseEther(swapAmt), gasopts);
+      await approveTx.wait();
+      const tx = await amm.swap(ADDRESSES.stableToken, ethers.parseEther(swapAmt), 0n, gasopts);
       await tx.wait();
       setStatus({ type: "success", msg: "Swap executed!" });
     } catch(e) {
@@ -525,7 +509,6 @@ function AMM({ signer, wallet }) {
     <div>
       <div className="page-title">Risk AMM</div>
       <div className="page-sub">Automated market maker for risk token swaps</div>
-
       <div className="grid-2">
         <div className="card">
           <div className="card-title">Add Liquidity</div>
@@ -541,7 +524,6 @@ function AMM({ signer, wallet }) {
             {loading ? "Processing..." : "Add Liquidity"}
           </button>
         </div>
-
         <div className="card">
           <div className="card-title">Swap Tokens</div>
           <div className="form-group">
@@ -555,16 +537,11 @@ function AMM({ signer, wallet }) {
             </div>
           )}
           <div style={{display:'flex', gap:'0.5rem'}}>
-            <button className="btn btn-outline" onClick={getQuote} disabled={!swapAmt} style={{flex:1}}>
-              Get Quote
-            </button>
-            <button className="btn btn-primary" onClick={swap} disabled={loading || !swapAmt} style={{flex:1}}>
-              {loading ? "..." : "Swap"}
-            </button>
+            <button className="btn btn-outline" onClick={getQuote} disabled={!swapAmt} style={{flex:1}}>Get Quote</button>
+            <button className="btn btn-primary" onClick={swap} disabled={loading || !swapAmt} style={{flex:1}}>{loading ? "..." : "Swap"}</button>
           </div>
         </div>
       </div>
-
       {status && <div className={`status ${status.type}`}>{status.msg}</div>}
     </div>
   );
@@ -598,8 +575,9 @@ function Governance({ signer, wallet }) {
   const castVote = async (support) => {
     setLoading(true); setStatus(null);
     try {
+      const gasopts = await getGasOpts(signer.provider);
       const gov = new ethers.Contract(ADDRESSES.governor, GOVERNOR_ABI, signer);
-      const tx = await gov.castVote(PROPOSAL_ID, support);
+      const tx = await gov.castVote(PROPOSAL_ID, support, gasopts);
       await tx.wait();
       setStatus({ type: "success", msg: `Vote cast: ${support === 1 ? "FOR" : "AGAINST"}` });
       setHasVoted(true);
@@ -612,8 +590,9 @@ function Governance({ signer, wallet }) {
   const delegateVotes = async () => {
     setLoading(true); setStatus(null);
     try {
+      const gasopts = await getGasOpts(signer.provider);
       const token = new ethers.Contract(ADDRESSES.governanceToken, GOV_TOKEN_ABI, signer);
-      const tx = await token.delegate(delegate || wallet);
+      const tx = await token.delegate(delegate || wallet, gasopts);
       await tx.wait();
       setStatus({ type: "success", msg: `Delegated to ${delegate || "self"}` });
     } catch(e) {
@@ -626,7 +605,6 @@ function Governance({ signer, wallet }) {
     <div>
       <div className="page-title">DAO Governance</div>
       <div className="page-sub">Vote on risk parameters and protocol upgrades</div>
-
       <div className="card">
         <div className="card-title">Active Proposal</div>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
@@ -639,38 +617,22 @@ function Governance({ signer, wallet }) {
             </span>
           )}
         </div>
-
         {votes && (
           <div className="grid-3" style={{marginBottom:'1.5rem'}}>
-            <div className="stat">
-              <div className="stat-label">FOR</div>
-              <div className="stat-value green">{votes.for}</div>
-            </div>
-            <div className="stat">
-              <div className="stat-label">AGAINST</div>
-              <div className="stat-value" style={{color:'var(--red)'}}>{votes.against}</div>
-            </div>
-            <div className="stat">
-              <div className="stat-label">ABSTAIN</div>
-              <div className="stat-value yellow">{votes.abstain}</div>
-            </div>
+            <div className="stat"><div className="stat-label">FOR</div><div className="stat-value green">{votes.for}</div></div>
+            <div className="stat"><div className="stat-label">AGAINST</div><div className="stat-value" style={{color:'var(--red)'}}>{votes.against}</div></div>
+            <div className="stat"><div className="stat-label">ABSTAIN</div><div className="stat-value yellow">{votes.abstain}</div></div>
           </div>
         )}
-
         {hasVoted ? (
           <div className="status info">You have already voted on this proposal.</div>
         ) : (
           <div className="vote-row">
-            <button className="btn btn-success" onClick={() => castVote(1)} disabled={loading}>
-              {loading ? "..." : "Vote FOR"}
-            </button>
-            <button className="btn btn-danger" onClick={() => castVote(0)} disabled={loading}>
-              {loading ? "..." : "Vote AGAINST"}
-            </button>
+            <button className="btn btn-success" onClick={() => castVote(1)} disabled={loading}>{loading ? "..." : "Vote FOR"}</button>
+            <button className="btn btn-danger"  onClick={() => castVote(0)} disabled={loading}>{loading ? "..." : "Vote AGAINST"}</button>
           </div>
         )}
       </div>
-
       <div className="card">
         <div className="card-title">Delegate Voting Power</div>
         <div className="form-group">
@@ -681,7 +643,6 @@ function Governance({ signer, wallet }) {
           {loading ? "Processing..." : "Delegate Votes"}
         </button>
       </div>
-
       {status && <div className={`status ${status.type}`}>{status.msg}</div>}
     </div>
   );
@@ -707,11 +668,11 @@ export default function App() {
   }, []);
 
   const pages = [
-    { id: "dashboard",   label: "Dashboard" },
-    { id: "insurance",   label: "Insurance" },
-    { id: "vault",       label: "Vault" },
-    { id: "amm",         label: "AMM" },
-    { id: "governance",  label: "Governance" },
+    { id: "dashboard",  label: "Dashboard" },
+    { id: "insurance",  label: "Insurance" },
+    { id: "vault",      label: "Vault" },
+    { id: "amm",        label: "AMM" },
+    { id: "governance", label: "Governance" },
   ];
 
   const renderPage = () => {
@@ -743,7 +704,6 @@ export default function App() {
             : <button className="connect-btn" onClick={connect}>Connect Wallet</button>
           }
         </header>
-
         <nav className="nav">
           {pages.map(p => (
             <button key={p.id} className={`nav-btn ${page === p.id ? "active" : ""}`} onClick={() => setPage(p.id)}>
@@ -751,7 +711,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-
         <main className="main">
           {renderPage()}
         </main>

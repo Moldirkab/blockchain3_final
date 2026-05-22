@@ -11,11 +11,8 @@ import {
 } from "../generated/schema"
 
 export function handleRiskTypeUpdated(event: RiskTypeUpdated): void {
-  // 1. Try to load the existing entity first
   let id = event.params.riskType.toHex()
   let entity = RiskType.load(id)
-
-  // 2. If it doesn't exist, create it
   if (entity == null) {
     entity = new RiskType(id)
   }
