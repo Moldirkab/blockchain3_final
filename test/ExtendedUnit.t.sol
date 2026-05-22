@@ -19,12 +19,12 @@ import "../src/utils/PremiumMath.sol";
 // Vault extended
 // ═══════════════════════════════════════════════════════════════════════════════
 contract VaultExtendedTest is Test {
-    MockERC20        token;
+    MockERC20 token;
     UnderwriterVault vault;
 
     address admin = address(this);
-    address user  = address(0xA1);
-    address pool  = address(0xA2);
+    address user = address(0xA1);
+    address pool = address(0xA2);
     address rando = address(0xA3);
 
     function setUp() public {
@@ -115,11 +115,11 @@ contract OracleExtendedTest is Test {
     MockAggregator mock;
     ChainlinkOracle oracle;
 
-    address admin   = address(this);
+    address admin = address(this);
     address attacker = address(0xB1);
 
     function setUp() public {
-        mock   = new MockAggregator(2000e8, 8);
+        mock = new MockAggregator(2000e8, 8);
         oracle = new ChainlinkOracle(admin, address(mock), 1 days);
     }
 
@@ -131,13 +131,13 @@ contract OracleExtendedTest is Test {
     function testNormalisesHighDecimalFeed() public {
         // deploy fresh oracle with 20-decimal feed
         MockAggregator high = new MockAggregator(int256(2000e20), 20);
-        ChainlinkOracle o2  = new ChainlinkOracle(admin, address(high), 1 days);
+        ChainlinkOracle o2 = new ChainlinkOracle(admin, address(high), 1 days);
         assertEq(o2.getLatestPrice(), 2000e18);
     }
 
     function testNormalisesExact18DecimalFeed() public {
         MockAggregator exact = new MockAggregator(int256(2000e18), 18);
-        ChainlinkOracle o3   = new ChainlinkOracle(admin, address(exact), 1 days);
+        ChainlinkOracle o3 = new ChainlinkOracle(admin, address(exact), 1 days);
         assertEq(o3.getLatestPrice(), 2000e18);
     }
 
@@ -186,9 +186,9 @@ contract OracleExtendedTest is Test {
 contract PolicyNFTExtendedTest is Test {
     PolicyNFT nft;
 
-    address admin   = address(this);
-    address holder  = address(0xC1);
-    address minter  = address(0xC2);
+    address admin = address(this);
+    address holder = address(0xC1);
+    address minter = address(0xC2);
     address attacker = address(0xC3);
 
     bytes32 constant DEPEG = keccak256("DEPEG");
@@ -200,18 +200,29 @@ contract PolicyNFTExtendedTest is Test {
 
     function _mint(address to) internal returns (uint256) {
         vm.prank(minter);
-        return nft.mintPolicy(to, 100 ether, 5 ether, block.timestamp + 7 days, DEPEG);
+        return
+            nft.mintPolicy(
+                to,
+                100 ether,
+                5 ether,
+                block.timestamp + 7 days,
+                DEPEG
+            );
     }
 
-    function testNFTName() public view { assertEq(nft.name(), "Insurance Policy NFT"); }
-    function testNFTSymbol() public view { assertEq(nft.symbol(), "POLICY"); }
+    function testNFTName() public view {
+        assertEq(nft.name(), "Insurance Policy NFT");
+    }
+    function testNFTSymbol() public view {
+        assertEq(nft.symbol(), "POLICY");
+    }
 
     function testGetPolicyReturnsCorrectData() public {
         uint256 id = _mint(holder);
         PolicyNFT.PolicyData memory p = nft.getPolicy(id);
         assertEq(p.coverageAmount, 100 ether);
-        assertEq(p.premium,        5 ether);
-        assertEq(p.riskType,       DEPEG);
+        assertEq(p.premium, 5 ether);
+        assertEq(p.riskType, DEPEG);
         assertTrue(p.active);
         assertFalse(p.claimed);
     }
@@ -258,7 +269,13 @@ contract PolicyNFTExtendedTest is Test {
     function testUnauthorizedMintReverts() public {
         vm.prank(attacker);
         vm.expectRevert();
-        nft.mintPolicy(holder, 100 ether, 5 ether, block.timestamp + 1 days, DEPEG);
+        nft.mintPolicy(
+            holder,
+            100 ether,
+            5 ether,
+            block.timestamp + 1 days,
+            DEPEG
+        );
     }
 
     function testUnauthorizedMarkClaimedReverts() public {
@@ -271,7 +288,13 @@ contract PolicyNFTExtendedTest is Test {
     function testMintInvalidHolderReverts() public {
         vm.prank(minter);
         vm.expectRevert();
-        nft.mintPolicy(address(0), 100 ether, 5 ether, block.timestamp + 1 days, DEPEG);
+        nft.mintPolicy(
+            address(0),
+            100 ether,
+            5 ether,
+            block.timestamp + 1 days,
+            DEPEG
+        );
     }
 
     function testMintInvalidCoverageReverts() public {
@@ -289,7 +312,13 @@ contract PolicyNFTExtendedTest is Test {
     function testMintZeroRiskTypeReverts() public {
         vm.prank(minter);
         vm.expectRevert();
-        nft.mintPolicy(holder, 100 ether, 5 ether, block.timestamp + 1 days, bytes32(0));
+        nft.mintPolicy(
+            holder,
+            100 ether,
+            5 ether,
+            block.timestamp + 1 days,
+            bytes32(0)
+        );
     }
 
     function testSupportsInterfaceERC721() public view {
@@ -305,7 +334,7 @@ contract TokenExtendedTest is Test {
 
     address admin = address(this);
     address alice = address(0xD1);
-    address bob   = address(0xD2);
+    address bob = address(0xD2);
 
     function setUp() public {
         token = new RiskGovernanceToken(admin);
@@ -346,8 +375,12 @@ contract TokenExtendedTest is Test {
         assertEq(token.getVotes(alice), 200 ether);
     }
 
-    function testTokenName() public view { assertEq(token.name(), "Risk Governance Token"); }
-    function testTokenSymbol() public view { assertEq(token.symbol(), "RISK"); }
+    function testTokenName() public view {
+        assertEq(token.name(), "Risk Governance Token");
+    }
+    function testTokenSymbol() public view {
+        assertEq(token.symbol(), "RISK");
+    }
 
     function testNonMinterCannotMint() public {
         vm.prank(alice);
@@ -375,7 +408,7 @@ contract FactoryExtendedTest is Test {
 
     function testCreateGivesAdminMinterRole() public {
         address nftAddr = factory.createPolicyNFT(admin);
-        PolicyNFT nft   = PolicyNFT(nftAddr);
+        PolicyNFT nft = PolicyNFT(nftAddr);
         assertTrue(nft.hasRole(nft.MINTER_ROLE(), admin));
     }
 
@@ -388,7 +421,7 @@ contract FactoryExtendedTest is Test {
     function testCreate2SameSaltSameAdmin() public {
         bytes32 salt = keccak256("SALT_A");
         address predicted = factory.predictPolicyNFTAddress(admin, salt);
-        address actual    = factory.createPolicyNFTDeterministic(admin, salt);
+        address actual = factory.createPolicyNFTDeterministic(admin, salt);
         assertEq(predicted, actual);
     }
 
@@ -409,7 +442,11 @@ contract FactoryExtendedTest is Test {
     function testEmitsEventOnCreateDeterministic() public {
         bytes32 salt = keccak256("EMIT_SALT");
         vm.expectEmit(false, true, true, false);
-        emit InsuranceMarketFactory.PolicyNFTCreatedDeterministic(address(0), admin, salt);
+        emit InsuranceMarketFactory.PolicyNFTCreatedDeterministic(
+            address(0),
+            admin,
+            salt
+        );
         factory.createPolicyNFTDeterministic(admin, salt);
     }
 }
@@ -441,8 +478,11 @@ contract PremiumMathExtendedTest is Test {
 
     function testKnownValue() public view {
         // 10_000 ether * 500 bps * 30 days / 36500 = ~410958904109589041095 wei
-        uint256 expected = (10_000 ether * 500 * 30) / 36500;
-        assertEq(math.calculatePremiumSolidity(10_000 ether, 500, 30), expected);
+        uint256 expected = (uint256(10_000 ether) * 500 * 30) / 365 / 100;
+        assertEq(
+            math.calculatePremiumSolidity(10_000 ether, 500, 30),
+            expected
+        );
     }
 
     function testSolidityAndYulAlwaysMatch(
@@ -451,8 +491,8 @@ contract PremiumMathExtendedTest is Test {
         uint256 durationDays
     ) public view {
         // bound to avoid arithmetic overflow
-        coverage     = bound(coverage, 0, 1e28);
-        riskBps      = bound(riskBps,  0, 10_000);
+        coverage = bound(coverage, 0, 1e28);
+        riskBps = bound(riskBps, 0, 10_000);
         durationDays = bound(durationDays, 0, 3650);
         assertEq(
             math.calculatePremiumSolidity(coverage, riskBps, durationDays),
@@ -465,20 +505,25 @@ contract PremiumMathExtendedTest is Test {
 // Treasury extended
 // ═══════════════════════════════════════════════════════════════════════════════
 contract TreasuryExtendedTest is Test {
-    MockERC20        token;
+    MockERC20 token;
     ProtocolTreasury treasury;
 
-    address admin     = address(this);
+    address admin = address(this);
     address treasurer = address(0xF1);
-    address attacker  = address(0xF2);
-    address receiver  = address(0xF3);
+    address attacker = address(0xF2);
+    address receiver = address(0xF3);
 
     function setUp() public {
         token = new MockERC20("USD", "USDC");
 
         ProtocolTreasury impl = new ProtocolTreasury();
-        bytes memory data = abi.encodeCall(ProtocolTreasury.initialize, (admin, 300));
-        treasury = ProtocolTreasury(address(new ERC1967Proxy(address(impl), data)));
+        bytes memory data = abi.encodeCall(
+            ProtocolTreasury.initialize,
+            (admin, 300)
+        );
+        treasury = ProtocolTreasury(
+            address(new ERC1967Proxy(address(impl), data))
+        );
 
         treasury.grantRole(treasury.TREASURER_ROLE(), treasurer);
     }

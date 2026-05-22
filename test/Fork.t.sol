@@ -30,7 +30,10 @@ interface IERC20Min {
 
 // ── Uniswap V2 Router interface (subset) ─────────────────────────────────────
 interface IUniswapV2Router {
-    function getAmountsOut(uint256, address[] calldata) external view returns (uint256[] memory);
+    function getAmountsOut(
+        uint256,
+        address[] calldata
+    ) external view returns (uint256[] memory);
     function swapExactTokensForTokens(
         uint256 amountIn,
         uint256 amountOutMin,
@@ -45,7 +48,8 @@ interface IUniswapV2Router {
 // ─────────────────────────────────────────────────────────────────────────────
 contract ForkTestChainlinkSepolia is Test {
     // Chainlink ETH/USD on Sepolia (Aug 2024 address – still active as of 2025)
-    address constant ETH_USD_FEED_SEPOLIA = 0x694AA1769357215DE4FAC081bf1f309aDC325306;
+    address constant ETH_USD_FEED_SEPOLIA =
+        0x694AA1769357215DE4FAC081bf1f309aDC325306;
 
     ChainlinkOracle oracle;
     address admin = address(this);
@@ -65,8 +69,8 @@ contract ForkTestChainlinkSepolia is Test {
         uint256 price = oracle.getLatestPrice();
         assertGt(price, 0, "price must be > 0");
         // ETH price should be between $100 and $100,000
-        assertGt(price, 100e18,    "price suspiciously low");
-        assertLt(price, 100_000e18,"price suspiciously high");
+        assertGt(price, 100e18, "price suspiciously low");
+        assertLt(price, 100_000e18, "price suspiciously high");
     }
 
     /// @notice Oracle normalises 8-dec Chainlink feed to 18 decimals
@@ -75,7 +79,7 @@ contract ForkTestChainlinkSepolia is Test {
 
         // raw Chainlink answer has 8 decimals; oracle should return 18-dec value
         IPriceFeed feed = IPriceFeed(ETH_USD_FEED_SEPOLIA);
-        (, int256 rawAnswer,,,) = feed.latestRoundData();
+        (, int256 rawAnswer, , , ) = feed.latestRoundData();
         uint256 expected = uint256(rawAnswer) * 1e10;
         assertEq(oracle.getLatestPrice(), expected);
     }
@@ -96,13 +100,13 @@ contract ForkTestChainlinkSepolia is Test {
 // ─────────────────────────────────────────────────────────────────────────────
 contract MainnetForkVaultWithRealUSDC is Test {
     // Mainnet USDC (6 decimals)
-    address constant USDC         = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     // A large USDC holder (Circle treasury / Binance hot wallet; still well-funded)
-    address constant USDC_WHALE   = 0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341;
+    address constant USDC_WHALE = 0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341;
 
     UnderwriterVault vault;
     address admin = address(this);
-    address user  = address(0xBEEF);
+    address user = address(0xBEEF);
 
     function setUp() public {
         string memory rpc = vm.envOr("MAINNET_RPC_URL", string(""));
@@ -110,7 +114,7 @@ contract MainnetForkVaultWithRealUSDC is Test {
         vm.createSelectFork(rpc);
 
         // Deploy vault backed by real USDC
-        vault = new UnderwriterVault(IERC20Min(USDC), admin);
+        vault = new UnderwriterVault(IERC20(USDC), admin);
         vault.grantRole(vault.INSURANCE_POOL_ROLE(), admin);
 
         // Give our test user some USDC by impersonating the whale
@@ -167,10 +171,11 @@ contract MainnetForkVaultWithRealUSDC is Test {
 //   — get a USDC→WETH quote, then execute it
 // ─────────────────────────────────────────────────────────────────────────────
 contract MainnetForkUniswapV2 is Test {
-    address constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-    address constant USDC              = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    address constant WETH              = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address constant USDC_WHALE        = 0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341;
+    address constant UNISWAP_V2_ROUTER =
+        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address constant USDC_WHALE = 0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341;
 
     address trader = address(0xDEAD);
 
@@ -198,8 +203,8 @@ contract MainnetForkUniswapV2 is Test {
         assertEq(amounts.length, 2);
         assertGt(amounts[1], 0, "amountOut should be positive");
         // 1000 USDC → between 0.1 and 1 ETH at reasonable prices
-        assertGt(amounts[1], 0.1 ether,  "amountOut too low");
-        assertLt(amounts[1], 10 ether,   "amountOut too high");
+        assertGt(amounts[1], 0.1 ether, "amountOut too low");
+        assertLt(amounts[1], 10 ether, "amountOut too high");
     }
 
     /// @notice Execute USDC→WETH swap via Uniswap V2 Router
@@ -218,7 +223,7 @@ contract MainnetForkUniswapV2 is Test {
         uint256[] memory amounts = IUniswapV2Router(UNISWAP_V2_ROUTER)
             .swapExactTokensForTokens(
                 amountIn,
-                1,                       // minAmountOut = 1 wei (test environment)
+                1, // minAmountOut = 1 wei (test environment)
                 path,
                 trader,
                 block.timestamp + 300
@@ -235,7 +240,11 @@ contract MainnetForkUniswapV2 is Test {
 
         // Mainnet Chainlink ETH/USD
         address ETH_USD_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
-        ChainlinkOracle oracle = new ChainlinkOracle(address(this), ETH_USD_MAINNET, 1 hours);
+        ChainlinkOracle oracle = new ChainlinkOracle(
+            address(this),
+            ETH_USD_MAINNET,
+            1 hours
+        );
         uint256 chainlinkPrice = oracle.getLatestPrice(); // 18-dec USD per ETH
 
         // Get Uniswap implied price: how many USDC for 1 WETH
