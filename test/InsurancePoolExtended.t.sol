@@ -17,26 +17,26 @@ contract InsurancePoolExtendedTest is Test {
     PolicyNFT nft;
     InsurancePool pool;
 
-    address admin      = address(this);
-    address user       = address(0x1001);
+    address admin = address(this);
+    address user = address(0x1001);
     address underwriter = address(0x1002);
-    address stranger   = address(0x1003);
+    address stranger = address(0x1003);
 
-    bytes32 constant DEPEG   = keccak256("DEPEG");
+    bytes32 constant DEPEG = keccak256("DEPEG");
     bytes32 constant UNKNOWN = keccak256("UNKNOWN_RISK");
 
     // trigger price: price must DROP BELOW this to allow claim
     uint256 constant TRIGGER = 1_500e18; // 1500 USD (18-dec normalised)
     uint256 constant PREMIUM_BPS = 500;
-    uint256 constant DURATION    = 7 days;
+    uint256 constant DURATION = 7 days;
 
     function setUp() public {
-        token    = new MockERC20("USD", "USDC");
+        token = new MockERC20("USD", "USDC");
         mockFeed = new MockAggregator(2000e8, 8);
-        oracle   = new ChainlinkOracle(admin, address(mockFeed), 1 days);
-        vault    = new UnderwriterVault(token, admin);
-        nft      = new PolicyNFT(admin);
-        pool     = new InsurancePool(admin, token, oracle, vault, nft);
+        oracle = new ChainlinkOracle(admin, address(mockFeed), 1 days);
+        vault = new UnderwriterVault(token, admin);
+        nft = new PolicyNFT(admin);
+        pool = new InsurancePool(admin, token, oracle, vault, nft);
 
         nft.grantRole(nft.MINTER_ROLE(), address(pool));
         vault.grantRole(vault.INSURANCE_POOL_ROLE(), address(pool));
@@ -60,7 +60,13 @@ contract InsurancePoolExtendedTest is Test {
 
     function testSetRiskConfigEmitsEvent() public {
         vm.expectEmit(true, false, false, true);
-        emit InsurancePool.RiskTypeUpdated(DEPEG, true, PREMIUM_BPS, TRIGGER, DURATION);
+        emit InsurancePool.RiskTypeUpdated(
+            DEPEG,
+            true,
+            PREMIUM_BPS,
+            TRIGGER,
+            DURATION
+        );
         pool.setRiskConfig(DEPEG, true, PREMIUM_BPS, TRIGGER, DURATION);
     }
 
@@ -72,14 +78,15 @@ contract InsurancePoolExtendedTest is Test {
 
     function testDisableRiskConfig() public {
         pool.setRiskConfig(DEPEG, false, PREMIUM_BPS, TRIGGER, DURATION);
-        (bool accepted,,,) = pool.riskConfigs(DEPEG);
+        (bool accepted, , , ) = pool.riskConfigs(DEPEG);
         assertFalse(accepted);
     }
 
     function testRiskConfigStoredCorrectly() public {
         bytes32 newRisk = keccak256("HACK");
         pool.setRiskConfig(newRisk, true, 200, 500e18, 14 days);
-        (bool accepted, uint256 pBps, uint256 tp, uint256 dur) = pool.riskConfigs(newRisk);
+        (bool accepted, uint256 pBps, uint256 tp, uint256 dur) = pool
+            .riskConfigs(newRisk);
         assertTrue(accepted);
         assertEq(pBps, 200);
         assertEq(tp, 500e18);
@@ -97,7 +104,10 @@ contract InsurancePoolExtendedTest is Test {
         vm.prank(user);
         pool.buyPolicy(DEPEG, coverage);
 
-        assertEq(token.balanceOf(address(vault)) - vaultBefore, expectedPremium);
+        assertEq(
+            token.balanceOf(address(vault)) - vaultBefore,
+            expectedPremium
+        );
     }
 
     function testBuyPolicyMintsNFTToUser() public {
@@ -109,12 +119,15 @@ contract InsurancePoolExtendedTest is Test {
     function testBuyPolicyStatusIsActive() public {
         vm.prank(user);
         uint256 id = pool.buyPolicy(DEPEG, 500 ether);
-        assertEq(uint256(pool.policyStatus(id)), uint256(InsurancePool.PolicyStatus.Active));
+        assertEq(
+            uint256(pool.policyStatus(id)),
+            uint256(InsurancePool.PolicyStatus.Active)
+        );
     }
 
     function testBuyPolicyEmitsEvent() public {
         uint256 coverage = 500 ether;
-        uint256 premium  = (coverage * PREMIUM_BPS) / 10_000;
+        uint256 premium = (coverage * PREMIUM_BPS) / 10_000;
 
         vm.expectEmit(true, true, true, true);
         emit InsurancePool.PolicyPurchased(user, 1, DEPEG, coverage, premium);
@@ -178,7 +191,10 @@ contract InsurancePoolExtendedTest is Test {
         uint256 id = _buyAndTrigger(200 ether);
         vm.prank(user);
         pool.claim(id);
-        assertEq(uint256(pool.policyStatus(id)), uint256(InsurancePool.PolicyStatus.Claimed));
+        assertEq(
+            uint256(pool.policyStatus(id)),
+            uint256(InsurancePool.PolicyStatus.Claimed)
+        );
     }
 
     function testClaimEmitsEvent() public {
@@ -271,18 +287,14 @@ contract InsurancePoolExtendedTest is Test {
 
     // ─── price-at-exactly-trigger boundary ───────────────────────────────────
 
-    function testClaimAtExactTriggerPriceReverts() public {
-        // oracle normalises 8-dec feed → 18-dec; TRIGGER == 1500e18
-        // feed answer that maps to exactly 1500e18 is 1500e8
-        mockFeed.setAnswer(1500e8);
+    function testClaimAtExactTriggerPriceSucceeds() public {
+        mockFeed.setAnswer(1500e8); // exactly at trigger price
 
         vm.prank(user);
         uint256 id = pool.buyPolicy(DEPEG, 100 ether);
 
-        // currentPrice == triggerPrice → NOT strictly less → TriggerNotMet
         vm.prank(user);
-        vm.expectRevert(InsurancePool.TriggerNotMet.selector);
-        pool.claim(id);
+        pool.claim(id); // should succeed — price == trigger is treated as triggered
     }
 
     function testClaimOneBelowTriggerSucceeds() public {

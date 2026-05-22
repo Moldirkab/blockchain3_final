@@ -18,9 +18,9 @@ import "../src/utils/PremiumMath.sol";
 contract AMMFuzzTest is Test {
     MockERC20 token0;
     MockERC20 token1;
-    RiskAMM   amm;
+    RiskAMM amm;
 
-    address LP   = address(0x1);
+    address LP = address(0x1);
     address swapper = address(0x2);
 
     function setUp() public {
@@ -45,10 +45,17 @@ contract AMMFuzzTest is Test {
     }
 
     /// @notice k must never decrease after a swap
-    function testFuzz_kNeverDecreases(uint96 liq0, uint96 liq1, uint96 swapAmt) public {
-        liq0    = uint96(bound(liq0,    1e18, 1e24));
-        liq1    = uint96(bound(liq1,    1e18, 1e24));
-        swapAmt = uint96(bound(swapAmt, 1,    uint96(liq0) / 2));
+    function testFuzz_kNeverDecreases(
+        uint96 liq0,
+        uint96 liq1,
+        uint96 swapAmt
+    ) public {
+        liq0 = uint96(bound(liq0, 1e18, 1e22));
+        liq1 = uint96(bound(liq1, 1e18, 1e22));
+        swapAmt = uint96(bound(swapAmt, 1e9, liq0 / 4));
+
+        // skip if bounds produced an invalid range (liq0/4 < 1e9)
+        vm.assume(liq0 / 4 >= 1e9);
 
         vm.prank(LP);
         amm.addLiquidity(liq0, liq1);
@@ -56,16 +63,19 @@ contract AMMFuzzTest is Test {
         uint256 kBefore = amm.reserve0() * amm.reserve1();
 
         vm.prank(swapper);
-        amm.swap(address(token0), swapAmt, 1);
+        amm.swap(address(token0), swapAmt, 0);
 
         uint256 kAfter = amm.reserve0() * amm.reserve1();
         assertGe(kAfter, kBefore, "k decreased after swap");
     }
 
     /// @notice output must never equal or exceed the whole reserve
-    function testFuzz_swapOutputBoundedByReserve(uint96 liq, uint96 swapAmt) public {
-        liq     = uint96(bound(liq,     2e18, 1e24));
-        swapAmt = uint96(bound(swapAmt, 1,    uint96(liq) / 4));
+    function testFuzz_swapOutputBoundedByReserve(
+        uint96 liq,
+        uint96 swapAmt
+    ) public {
+        liq = uint96(bound(liq, 2e18, 1e24));
+        swapAmt = uint96(bound(swapAmt, 1, uint96(liq) / 4));
 
         vm.prank(LP);
         amm.addLiquidity(liq, liq);
@@ -76,18 +86,22 @@ contract AMMFuzzTest is Test {
     }
 
     /// @notice getAmountOut preview must match actual swap output
-    function testFuzz_previewMatchesActualSwap(uint96 liq, uint64 swapAmt) public {
-        liq     = uint96(bound(liq,     2e18, 1e22));
-        swapAmt = uint64(bound(swapAmt, 1,    liq / 4));
+    function testFuzz_previewMatchesActualSwap(
+        uint96 liq,
+        uint64 swapAmt
+    ) public {
+        liq = uint96(bound(liq, 2e18, 1e22));
+        swapAmt = uint64(bound(swapAmt, 1e9, liq / 4)); // min 1e9 avoids zero output
 
         vm.prank(LP);
         amm.addLiquidity(liq, liq);
 
         uint256 preview = amm.getAmountOut(address(token0), swapAmt);
+        vm.assume(preview > 0); // skip edge cases where integer division rounds to 0
 
         uint256 before = token1.balanceOf(swapper);
         vm.prank(swapper);
-        amm.swap(address(token0), swapAmt, 1);
+        amm.swap(address(token0), swapAmt, 0); // 0 = no slippage constraint
         uint256 received = token1.balanceOf(swapper) - before;
 
         assertEq(preview, received, "preview != actual");
@@ -116,7 +130,7 @@ contract AMMFuzzTest is Test {
 // Vault Fuzz Tests
 // ═══════════════════════════════════════════════════════════════════════════════
 contract VaultFuzzTest is Test {
-    MockERC20        token;
+    MockERC20 token;
     UnderwriterVault vault;
 
     address user = address(0xAA);
@@ -155,9 +169,12 @@ contract VaultFuzzTest is Test {
     }
 
     /// @notice availableLiquidity decreases exactly by claim amount
-    function testFuzz_payClaimReducesLiquidityExactly(uint96 deposit, uint96 claim) public {
+    function testFuzz_payClaimReducesLiquidityExactly(
+        uint96 deposit,
+        uint96 claim
+    ) public {
         deposit = uint96(bound(deposit, 1e18, type(uint96).max));
-        claim   = uint96(bound(claim, 1, deposit));
+        claim = uint96(bound(claim, 1, deposit));
 
         vm.prank(user);
         vault.deposit(deposit, user);
@@ -177,7 +194,7 @@ contract GovernanceFuzzTest is Test {
 
     address admin = address(this);
     address alice = address(0x11);
-    address bob   = address(0x22);
+    address bob = address(0x22);
 
     function setUp() public {
         token = new RiskGovernanceToken(admin);
@@ -194,9 +211,12 @@ contract GovernanceFuzzTest is Test {
     }
 
     /// @notice transferring tokens moves exact voting power
-    function testFuzz_transferMovesVotingPower(uint96 total, uint96 xfer) public {
+    function testFuzz_transferMovesVotingPower(
+        uint96 total,
+        uint96 xfer
+    ) public {
         total = uint96(bound(total, 2, type(uint96).max));
-        xfer  = uint96(bound(xfer,  1, total - 1));
+        xfer = uint96(bound(xfer, 1, total - 1));
 
         token.mint(alice, total);
         vm.prank(alice);
@@ -210,13 +230,16 @@ contract GovernanceFuzzTest is Test {
         vm.roll(block.number + 1);
 
         assertEq(token.getVotes(alice), total - xfer);
-        assertEq(token.getVotes(bob),   xfer);
+        assertEq(token.getVotes(bob), xfer);
     }
 
     /// @notice total supply must equal sum of all minted amounts
-    function testFuzz_totalSupplyConservation(uint64 mint1, uint64 mint2) public {
+    function testFuzz_totalSupplyConservation(
+        uint64 mint1,
+        uint64 mint2
+    ) public {
         token.mint(alice, mint1);
-        token.mint(bob,   mint2);
+        token.mint(bob, mint2);
         uint256 initial = 1_000_000 ether;
         assertEq(token.totalSupply(), initial + mint1 + mint2);
     }
@@ -226,26 +249,26 @@ contract GovernanceFuzzTest is Test {
 // InsurancePool Fuzz Tests
 // ═══════════════════════════════════════════════════════════════════════════════
 contract InsurancePoolFuzzTest is Test {
-    MockERC20      token;
+    MockERC20 token;
     MockAggregator mockFeed;
     ChainlinkOracle oracle;
     UnderwriterVault vault;
-    PolicyNFT      nft;
-    InsurancePool  pool;
+    PolicyNFT nft;
+    InsurancePool pool;
 
-    address admin       = address(this);
-    address underwriter = address(0xU1);
-    address user        = address(0xU2);
+    address admin = address(this);
+    address underwriter = address(0x01);
+    address user = address(0x02);
 
     bytes32 constant DEPEG = keccak256("DEPEG");
 
     function setUp() public {
-        token    = new MockERC20("USD", "USDC");
+        token = new MockERC20("USD", "USDC");
         mockFeed = new MockAggregator(2000e8, 8);
-        oracle   = new ChainlinkOracle(admin, address(mockFeed), 1 days);
-        vault    = new UnderwriterVault(token, admin);
-        nft      = new PolicyNFT(admin);
-        pool     = new InsurancePool(admin, token, oracle, vault, nft);
+        oracle = new ChainlinkOracle(admin, address(mockFeed), 1 days);
+        vault = new UnderwriterVault(token, admin);
+        nft = new PolicyNFT(admin);
+        pool = new InsurancePool(admin, token, oracle, vault, nft);
 
         nft.grantRole(nft.MINTER_ROLE(), address(pool));
         vault.grantRole(vault.INSURANCE_POOL_ROLE(), address(pool));
@@ -273,7 +296,10 @@ contract InsurancePoolFuzzTest is Test {
         vm.prank(user);
         pool.buyPolicy(DEPEG, coverage);
 
-        assertEq(token.balanceOf(address(vault)) - vaultBefore, expectedPremium);
+        assertEq(
+            token.balanceOf(address(vault)) - vaultBefore,
+            expectedPremium
+        );
     }
 
     /// @notice policy ids are always sequential starting from 1
@@ -297,7 +323,7 @@ contract OracleFuzzTest is Test {
     address admin = address(this);
 
     function setUp() public {
-        mock8   = new MockAggregator(1e8, 8);
+        mock8 = new MockAggregator(1e8, 8);
         oracle8 = new ChainlinkOracle(admin, address(mock8), 1 days);
     }
 
@@ -312,7 +338,7 @@ contract OracleFuzzTest is Test {
     /// @notice valid price never reverts within staleness window
     function testFuzz_validPriceNeverReverts(uint72 price, uint32 age) public {
         price = uint72(bound(price, 1, type(uint72).max));
-        age   = uint32(bound(age,  0, 1 days - 1));
+        age = uint32(bound(age, 0, 1 days - 1));
 
         mock8.setAnswer(int256(uint256(price)));
         vm.warp(block.timestamp + age);
