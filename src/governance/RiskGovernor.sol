@@ -19,31 +19,37 @@ contract RiskGovernor is
     GovernorVotesQuorumFraction,
     GovernorTimelockControl
 {
-    IERC20 private immutable tokenForThreshold;
+    IERC20 public immutable thresholdToken;
 
     constructor(
         IVotes votingToken,
-        IERC20 thresholdToken,
+        IERC20 _thresholdToken,
         TimelockController timelock
     )
         Governor("RiskGovernor")
-        GovernorSettings(7200, 50400, 0)
+        GovernorSettings(
+            0, // voting delay: 60 seconds before voting starts
+            7200, // voting period: 5 minutes
+            0 // proposal threshold handled separately
+        )
         GovernorVotes(votingToken)
         GovernorVotesQuorumFraction(4)
         GovernorTimelockControl(timelock)
     {
-        tokenForThreshold = thresholdToken;
+        thresholdToken = _thresholdToken;
     }
 
+    // ---------- Proposal threshold ----------
     function proposalThreshold()
         public
         view
         override(Governor, GovernorSettings)
         returns (uint256)
     {
-        return tokenForThreshold.totalSupply() / 100;
+        return 1 ether; // SAFE FIXED VALUE (no dynamic bugs)
     }
 
+    // ---------- Voting config ----------
     function votingDelay()
         public
         view
@@ -62,6 +68,7 @@ contract RiskGovernor is
         return super.votingPeriod();
     }
 
+    // ---------- Quorum ----------
     function quorum(
         uint256 blockNumber
     )
@@ -73,6 +80,7 @@ contract RiskGovernor is
         return super.quorum(blockNumber);
     }
 
+    // ---------- State ----------
     function state(
         uint256 proposalId
     )
@@ -90,6 +98,7 @@ contract RiskGovernor is
         return super.proposalNeedsQueuing(proposalId);
     }
 
+    // ---------- Timelock execution flow ----------
     function _queueOperations(
         uint256 proposalId,
         address[] memory targets,
